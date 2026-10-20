@@ -55,7 +55,9 @@
   .tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .tabs button { font: inherit; font-size: 14px; border: 1px solid transparent; background: none; color: var(--text-secondary);
                  padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-  .tabs button[aria-selected="true"] { background: var(--row-active); color: var(--text-primary); border-color: var(--border); }
+  .tablist { display: flex; gap: 4px; }
+  .tabs .toggle { margin-left: 8px; border-color: var(--border); }
+  .tabs button[aria-selected="true"], .tabs button[aria-pressed="true"] { background: var(--row-active); color: var(--text-primary); border-color: var(--border); }
   .search { margin-left: auto; font: inherit; font-size: 14px; padding: 5px 10px; border-radius: 6px;
             border: 1px solid var(--border); background: var(--surface-0); color: var(--text-primary); min-width: 0; width: 180px; }
   .tablewrap { max-height: 590px; overflow: auto; }
@@ -73,6 +75,10 @@
   ul { padding-left: 20px; max-width: 72ch; }
   .leaflet-container { background: var(--surface-0); font: inherit; }
   .leaflet-tooltip { font-size: 13px; }
+  .maphint { position: absolute; z-index: 1000; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 80%;
+             padding: 10px 14px; border-radius: 8px; text-align: center; pointer-events: none;
+             background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary); }
+  .maphint[hidden] { display: none; }
   .maperr { position: absolute; z-index: 1000; inset: 16px 16px auto; padding: 10px 14px; border-radius: 8px;
             background: var(--surface-1); border: 1px solid var(--missing); color: var(--text-primary); }
   /* OpenStreetMap has no dark style: dim and invert the basemap tiles in dark mode */
@@ -93,18 +99,24 @@
 
   <div class="layout">
     <div class="panel">
-      <div id="map" role="region" aria-label="Map of street frontage with and without sidewalks"></div>
+      <div id="map" role="region" aria-label="Map of street frontage with and without sidewalks">
+        <div class="maphint" id="map-hint" role="status" hidden>Select an owner in the table to show their frontage</div>
+      </div>
       <div class="legend">
         <span><i style="background:var(--missing)"></i>No sidewalk within 25 ft</span>
         <span><i style="background:var(--covered)"></i>Sidewalk present</span>
-        <span class="muted">Shows collector/arterial frontage citywide, plus all frontage of the ranked owners.
+        <span class="muted" id="legend-note">Shows collector/arterial frontage citywide, plus all frontage of the ranked owners.
           Click a row to zoom.</span>
       </div>
     </div>
     <div class="panel">
-      <div class="tabs" role="tablist">
-        <button role="tab" data-sort="major" aria-selected="true">Busy streets</button>
-        <button role="tab" data-sort="all" aria-selected="false">All streets</button>
+      <div class="tabs">
+        <div class="tablist" role="tablist" aria-label="Rank owners by">
+          <button role="tab" data-sort="major" aria-selected="true">Busy streets</button>
+          <button role="tab" data-sort="all" aria-selected="false">All streets</button>
+        </div>
+        <button class="toggle" id="hide-others" aria-pressed="false"
+                title="Show only the selected owner's frontage on the map">Hide unselected</button>
         <input class="search" type="search" placeholder="Filter owners…" aria-label="Filter owners">
       </div>
       <div class="tablewrap">
@@ -159,6 +171,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 let layer, owners = [], byId = {}, selected = null, sortKey = "major", filter = "";
+let hideOthers = false, allLines = [], linesByOwner = {};  // sublayers, kept so they can be removed and re-added
 const style = f => ({
   color: f.properties.s ? css("--covered") : css("--missing"),
   weight: f.properties.o === selected && selected !== null ? 5 : (f.properties.s ? 2 : 2.5),
@@ -178,6 +191,12 @@ Promise.all([fetch("data/owners.json").then(r => r.json()), fetch("data/frontage
         l.on("click", () => p.o != null && select(p.o, false));
       }
     }).addTo(map);
+    layer.eachLayer(l => {
+      allLines.push(l);
+      const o = l.feature.properties.o;
+      if (o != null) (linesByOwner[o] ||= []).push(l);
+    });
+    applyVisibility();
     renderRows();
   })
   .catch(err => {
@@ -215,11 +234,25 @@ function renderRows() {
     </tr>`).join("");
 }
 
+// With "Hide unselected" on, only the selected owner's lines stay on the map. Lines are removed rather
+// than made transparent so hidden ones don't still show tooltips or catch clicks.
+function applyVisibility() {
+  if (!layer) return;
+  layer.clearLayers();
+  const shown = !hideOthers ? allLines : selected === null ? [] : linesByOwner[selected] || [];
+  shown.forEach(l => layer.addLayer(l));
+  layer.setStyle(style);
+  document.getElementById("map-hint").hidden = !(hideOthers && selected === null);
+  document.getElementById("legend-note").textContent = hideOthers
+    ? "Showing the selected owner only. Click a row to select an owner."
+    : "Shows collector/arterial frontage citywide, plus all frontage of the ranked owners. Click a row to zoom.";
+}
+
 function select(id, zoom = true) {
   selected = selected === id && zoom ? null : id;
-  layer.setStyle(style);
+  if (hideOthers) applyVisibility(); else layer.setStyle(style);
   if (selected !== null) {
-    layer.eachLayer(l => l.feature.properties.o === selected && l.bringToFront());
+    if (!hideOthers) (linesByOwner[selected] || []).forEach(l => l.bringToFront());
     const b = byId[selected].bbox;
     if (zoom && b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [30, 30], maxZoom: 17 });
   }
@@ -230,10 +263,16 @@ function select(id, zoom = true) {
 document.getElementById("rows").addEventListener("click", e => {
   const tr = e.target.closest("tr"); if (tr) select(+tr.dataset.id);
 });
-document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+const tabs = document.querySelectorAll('.tabs [role="tab"]');
+tabs.forEach(b => b.addEventListener("click", () => {
+  tabs.forEach(x => x.setAttribute("aria-selected", x === b));
   sortKey = b.dataset.sort; renderRows();
 }));
+document.getElementById("hide-others").addEventListener("click", e => {
+  hideOthers = !hideOthers;
+  e.currentTarget.setAttribute("aria-pressed", hideOthers);
+  applyVisibility();
+});
 document.querySelector(".search").addEventListener("input", e => { filter = e.target.value.toLowerCase(); renderRows(); });
 dark.addEventListener("change", () => layer && layer.setStyle(style));
 </script>
