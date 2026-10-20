@@ -10,7 +10,6 @@ import json, re, shutil, sys
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 import shapely
 
@@ -50,7 +49,12 @@ keep = fr.oid.notna() | (fr.street_class == "major")
 fr = fr[keep].copy()
 fr["geometry"] = fr.geometry.simplify(3)
 fr = fr.to_crs(4326)
-fr["name"] = np.where(fr.PROPERTY_OWNER.map(is_entity), fr.owner, None)
+named = fr.PROPERTY_OWNER.map(is_entity).to_numpy()
+
+
+def val(x):
+    """JSON-safe scalar: pandas missing values (NaN/NA) become None."""
+    return None if pd.isna(x) else x
 
 bbox = {}
 for oid, g in fr[fr.oid.notna()].groupby("oid"):
@@ -58,14 +62,15 @@ for oid, g in fr[fr.oid.notna()].groupby("oid"):
     bbox[int(oid)] = [round(y0, 5), round(x0, 5), round(y1, 5), round(x1, 5)]
 
 feats = []
-for row in fr.itertuples():
+for is_named, row in zip(named, fr.itertuples()):
     geom = shapely.set_precision(row.geometry, 1e-5)
     if geom.is_empty:
         continue
+    name = val(row.owner) if is_named else None
     feats.append({"type": "Feature",
                   "properties": {"s": int(row.sidewalk), "c": row.street_class[0],
                                  "o": None if pd.isna(row.oid) else int(row.oid),
-                                 "n": row.name, "a": row.LOCATION_ADDR if row.name else None},
+                                 "n": name, "a": val(row.LOCATION_ADDR) if name else None},
                   "geometry": shapely.geometry.mapping(geom)})
 
 # ------------------------------------------------------------ summary
@@ -88,16 +93,19 @@ owners_json = [{
     "id": int(r.id), "owner": r.owner, "parcels": int(r.parcels),
     "frontage_mi": round(r.frontage_ft / 5280, 2), "missing_mi": round(r.missing_ft / 5280, 2),
     "major_mi": round(r.missing_major_ft / 5280, 2), "pct": round(r.pct_missing, 3),
-    "names": r.raw_names, "rank_all": rank_all.get(r.owner), "rank_major": rank_major.get(r.owner),
+    "names": val(r.raw_names), "rank_all": rank_all.get(r.owner), "rank_major": rank_major.get(r.owner),
     "bbox": bbox.get(int(r.id)),
 } for r in top.itertuples()]
 
 # ------------------------------------------------------------ write
 (site / "data").mkdir(parents=True, exist_ok=True)
 shutil.copy(Path(__file__).parent / "web" / "index.html", site / "index.html")
-(site / "data" / "owners.json").write_text(json.dumps({"summary": summary, "owners": owners_json}), encoding="utf-8")
+# allow_nan=False: fail the build rather than emit NaN, which browsers reject as invalid JSON
+(site / "data" / "owners.json").write_text(
+    json.dumps({"summary": summary, "owners": owners_json}, allow_nan=False), encoding="utf-8")
 (site / "data" / "frontage.geojson").write_text(
-    json.dumps({"type": "FeatureCollection", "features": feats}, separators=(",", ":")), encoding="utf-8")
+    json.dumps({"type": "FeatureCollection", "features": feats}, separators=(",", ":"), allow_nan=False),
+    encoding="utf-8")
 cols = ["owner", "parcels", "frontage_ft", "missing_ft", "missing_major_ft", "pct_missing", "pending_missing_ft", "raw_names"]
 top.assign(rank_all=top.owner.map(rank_all), rank_major=top.owner.map(rank_major))[
     ["rank_all", "rank_major"] + cols].round(0).to_csv(site / "data" / "top_owners.csv", index=False)
