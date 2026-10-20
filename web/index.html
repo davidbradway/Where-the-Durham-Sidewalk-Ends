@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the Durham Sidewalk Ends</title>
+<meta name="description" content="Which Durham property owners have the most street frontage without a sidewalk.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f6f5f2; --surface-1: #fcfcfb; --border: #e2e0da;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+    --missing: #eb6834; --covered: #2a78d6; --accent: #2a78d6;
+    --row-hover: #f0efec; --row-active: #e3edfb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+      --missing: #d95926; --covered: #3987e5; --accent: #6da7ec;
+      --row-hover: #262624; --row-active: #1c2c44;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --missing: #d95926; --covered: #3987e5; --accent: #6da7ec;
+    --row-hover: #262624; --row-active: #1c2c44;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface-0); color: var(--text-primary);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; margin: 40px 0 12px; }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  .lede { color: var(--text-secondary); font-size: 17px; }
+  .muted { color: var(--text-muted); font-size: 13px; }
+  a { color: var(--accent); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 24px 0; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .v { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tile .k { color: var(--text-secondary); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  #map { height: 640px; }
+  @media (max-width: 900px) { #map { height: 420px; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--border);
+            font-size: 13px; color: var(--text-secondary); }
+  .legend i { display: inline-block; width: 22px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tabs button { font: inherit; font-size: 14px; border: 1px solid transparent; background: none; color: var(--text-secondary);
+                 padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--row-active); color: var(--text-primary); border-color: var(--border); }
+  .search { margin-left: auto; font: inherit; font-size: 14px; padding: 5px 10px; border-radius: 6px;
+            border: 1px solid var(--border); background: var(--surface-0); color: var(--text-primary); min-width: 0; width: 180px; }
+  .tablewrap { max-height: 590px; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--surface-1); color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+  td.name, th.name { text-align: left; white-space: normal; }
+  td.name small { display: block; color: var(--text-muted); font-size: 12px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.active { background: var(--row-active); }
+  .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--missing); vertical-align: middle; margin-right: 6px; }
+  details { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  ul { padding-left: 20px; max-width: 72ch; }
+  .leaflet-container { background: var(--surface-0); font: inherit; }
+  .leaflet-tooltip { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Where the Durham Sidewalk Ends</h1>
+  <p class="lede">How much street frontage in the City of Durham has no sidewalk, and which organizations own the most of it.
+    Most gaps front single-family homes. On busy collector and arterial streets, though, a small group of large
+    owners accounts for a big share of the gap, so they are the natural place to start.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="layout">
+    <div class="panel">
+      <div id="map" role="region" aria-label="Map of street frontage with and without sidewalks"></div>
+      <div class="legend">
+        <span><i style="background:var(--missing)"></i>No sidewalk within 25 ft</span>
+        <span><i style="background:var(--covered)"></i>Sidewalk present</span>
+        <span class="muted">Shows collector/arterial frontage citywide, plus all frontage of the ranked owners.
+          Click a row to zoom.</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-sort="major" aria-selected="true">Busy streets</button>
+        <button role="tab" data-sort="all" aria-selected="false">All streets</button>
+        <input class="search" type="search" placeholder="Filter owners…" aria-label="Filter owners">
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th class="name">Owner</th><th id="h-main">Missing, busy streets (mi)</th>
+            <th id="h-alt">Missing, all (mi)</th><th>% of frontage missing</th><th>Parcels</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:8px">Download: <a href="data/top_owners.csv">top_owners.csv</a> ·
+    Built <span id="built"></span> from City/County of Durham open data.</p>
+
+  <h2>How this was measured</h2>
+  <details open><summary>Method</summary>
+    <ul>
+      <li><b>Frontage.</b> Each parcel boundary inside city limits is cut into 10 ft pieces. A piece counts as street
+        frontage when it is not shared with another parcel (so it borders the public right-of-way) and lies within 75 ft
+        of a public street centerline. Interstates, ramps, alleys and private drives are excluded.</li>
+      <li><b>Sidewalk.</b> A frontage piece is covered when a sidewalk from the city's inventory lies within 25 ft.
+        Raising this to 35 ft changes coverage by about one percentage point.</li>
+      <li><b>Busy streets</b> are collectors and arterials (minor and principal) in the city's street functional class.</li>
+      <li><b>Owners.</b> Names are normalized (punctuation and LLC/INC suffixes removed) and known variants are merged,
+        e.g. Duke University with Duke University Health System, and the several spellings of Durham Public Schools
+        and NCDOT.</li>
+    </ul>
+  </details>
+  <details><summary>Caveats</summary>
+    <ul>
+      <li>Streets in new subdivisions that the city has not yet accepted are left out. Their sidewalks are usually
+        required but not yet in the inventory.</li>
+      <li>Some frontage is not a realistic sidewalk location: railroad corridors, steep creek banks, and frontage along
+        limited-access roads that are classified as arterials.</li>
+      <li>The parcel layer and the sidewalk inventory don't always line up, so individual parcels can be wrong. Treat
+        owner totals as estimates and check specific sites before outreach.</li>
+      <li>Only organizations are named. Parcels owned by individuals are shown on the map without a name.</li>
+    </ul>
+  </details>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const fmt = (x, d = 1) => x == null ? "–" : x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = x => Math.round(x * 100) + "%";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const dark = matchMedia("(prefers-color-scheme: dark)");
+
+const map = L.map("map", { preferCanvas: true }).setView([35.99, -78.90], 12);
+const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${dark.matches ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`;
+const tiles = L.tileLayer(tileUrl(), {
+  maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> · Data: City/County of Durham'
+}).addTo(map);
+
+let layer, owners = [], byId = {}, selected = null, sortKey = "major", filter = "";
+const style = f => ({
+  color: f.properties.s ? css("--covered") : css("--missing"),
+  weight: f.properties.o === selected && selected !== null ? 5 : (f.properties.s ? 2 : 2.5),
+  opacity: selected === null || f.properties.o === selected ? 0.95 : 0.35,
+});
+
+Promise.all([fetch("data/owners.json").then(r => r.json()), fetch("data/frontage.geojson").then(r => r.json())])
+  .then(([o, geo]) => {
+    owners = o.owners; owners.forEach(x => byId[x.id] = x);
+    renderTiles(o.summary);
+    layer = L.geoJSON(geo, {
+      style,
+      onEachFeature: (f, l) => {
+        const p = f.properties;
+        l.bindTooltip(`<b>${p.n ?? "Individual owner"}</b>${p.a ? "<br>" + p.a : ""}<br>` +
+          `${p.s ? "Sidewalk present" : "No sidewalk"} · ${p.c === "m" ? "busy street" : "local street"}`, { sticky: true });
+        l.on("click", () => p.o != null && select(p.o, false));
+      }
+    }).addTo(map);
+    renderRows();
+  });
+
+function renderTiles(s) {
+  document.getElementById("built").textContent = s.built;
+  const t = [
+    [fmt(s.missing_mi, 0) + " mi", "of street frontage has no sidewalk"],
+    [pct(s.pct_covered), `of ${fmt(s.frontage_mi, 0)} mi of frontage has a sidewalk`],
+    [pct(s.top100_share_major), `of the ${fmt(s.major_missing_mi, 0)} mi busy-street gap belongs to the top 100 owners`],
+    [pct(s.single_family_share), "of all missing frontage fronts single-family homes"],
+  ];
+  document.getElementById("tiles").innerHTML = t.map(([v, k]) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
+}
+
+function renderRows() {
+  const key = sortKey === "major" ? "major_mi" : "missing_mi", alt = sortKey === "major" ? "missing_mi" : "major_mi";
+  const rank = sortKey === "major" ? "rank_major" : "rank_all";
+  document.getElementById("h-main").textContent = sortKey === "major" ? "Missing, busy streets (mi)" : "Missing, all (mi)";
+  document.getElementById("h-alt").textContent = sortKey === "major" ? "Missing, all (mi)" : "Missing, busy streets (mi)";
+  const rows = owners.filter(o => o[rank]).sort((a, b) => a[rank] - b[rank])
+    .filter(o => !filter || (o.owner + " " + o.names).toLowerCase().includes(filter));
+  const max = Math.max(...owners.map(o => o[key]));
+  document.getElementById("rows").innerHTML = rows.map(o => `
+    <tr data-id="${o.id}" class="${o.id === selected ? "active" : ""}">
+      <td>${o[rank]}</td>
+      <td class="name">${o.owner}${o.names && o.names.toUpperCase() !== o.owner ? `<small>${o.names}</small>` : ""}</td>
+      <td><span class="bar" style="width:${Math.max(2, 60 * o[key] / max)}px"></span>${fmt(o[key])}</td>
+      <td>${fmt(o[alt])}</td><td>${pct(o.pct)}</td><td>${o.parcels.toLocaleString()}</td>
+    </tr>`).join("");
+}
+
+function select(id, zoom = true) {
+  selected = selected === id && zoom ? null : id;
+  layer.setStyle(style);
+  if (selected !== null) {
+    layer.eachLayer(l => l.feature.properties.o === selected && l.bringToFront());
+    const b = byId[selected].bbox;
+    if (zoom && b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [30, 30], maxZoom: 17 });
+  }
+  renderRows();
+  document.querySelector(`tr[data-id="${selected}"]`)?.scrollIntoView({ block: "nearest" });
+}
+
+document.getElementById("rows").addEventListener("click", e => {
+  const tr = e.target.closest("tr"); if (tr) select(+tr.dataset.id);
+});
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  sortKey = b.dataset.sort; renderRows();
+}));
+document.querySelector(".search").addEventListener("input", e => { filter = e.target.value.toLowerCase(); renderRows(); });
+dark.addEventListener("change", () => { tiles.setUrl(tileUrl()); layer && layer.setStyle(style); });
+</script>
+</body>
+</html>
