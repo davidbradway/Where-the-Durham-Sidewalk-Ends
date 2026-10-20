@@ -73,6 +73,13 @@
   ul { padding-left: 20px; max-width: 72ch; }
   .leaflet-container { background: var(--surface-0); font: inherit; }
   .leaflet-tooltip { font-size: 13px; }
+  .maperr { position: absolute; z-index: 1000; inset: 16px 16px auto; padding: 10px 14px; border-radius: 8px;
+            background: var(--surface-1); border: 1px solid var(--missing); color: var(--text-primary); }
+  /* OpenStreetMap has no dark style: dim and invert the basemap tiles in dark mode */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85); }
+  }
+  :root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85); }
 </style>
 </head>
 <body>
@@ -147,9 +154,8 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const dark = matchMedia("(prefers-color-scheme: dark)");
 
 const map = L.map("map", { preferCanvas: true }).setView([35.99, -78.90], 12);
-const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${dark.matches ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`;
-const tiles = L.tileLayer(tileUrl(), {
-  maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> · Data: City/County of Durham'
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Data: City/County of Durham'
 }).addTo(map);
 
 let layer, owners = [], byId = {}, selected = null, sortKey = "major", filter = "";
@@ -173,6 +179,12 @@ Promise.all([fetch("data/owners.json").then(r => r.json()), fetch("data/frontage
       }
     }).addTo(map);
     renderRows();
+  })
+  .catch(err => {
+    const msg = location.protocol === "file:"
+      ? "Open this page through a web server (e.g. python -m http.server -d site); browsers block data files on file:// pages."
+      : "Could not load map data: " + err.message;
+    document.getElementById("map").insertAdjacentHTML("afterbegin", `<div class="maperr">${msg}</div>`);
   });
 
 function renderTiles(s) {
@@ -223,7 +235,7 @@ document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click
   sortKey = b.dataset.sort; renderRows();
 }));
 document.querySelector(".search").addEventListener("input", e => { filter = e.target.value.toLowerCase(); renderRows(); });
-dark.addEventListener("change", () => { tiles.setUrl(tileUrl()); layer && layer.setStyle(style); });
+dark.addEventListener("change", () => layer && layer.setStyle(style));
 </script>
 </body>
 </html>

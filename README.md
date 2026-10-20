@@ -132,7 +132,7 @@ All from City of Durham / Durham County open data, which may be subject to their
   ([REST](https://webgis2.durhamnc.gov/server/rest/services/PublicWorksServices/Sidewalks/MapServer/120))
 - [Street maintenance responsibility / centerlines](https://services2.arcgis.com/G5vR3cOjh6g2Ed8E/arcgis/rest/services/Street_Maintenance_Responsibility/FeatureServer/0)
 
-Basemap © OpenStreetMap contributors © CARTO.
+Basemap © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (standard tiles, no API key).
 
 ## License
 
