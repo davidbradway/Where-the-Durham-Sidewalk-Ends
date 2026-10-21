@@ -11,7 +11,7 @@
     color-scheme: light;
     --surface-0: #f6f5f2; --surface-1: #fcfcfb; --border: #e2e0da;
     --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
-    --missing: #eb6834; --covered: #2a78d6; --accent: #2a78d6;
+    --missing: #eb6834; --covered: #2a78d6; --sidewalk: #1a8a55; --accent: #2a78d6;
     --row-hover: #f0efec; --row-active: #e3edfb;
   }
   @media (prefers-color-scheme: dark) {
@@ -19,7 +19,7 @@
       color-scheme: dark;
       --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
       --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
-      --missing: #d95926; --covered: #3987e5; --accent: #6da7ec;
+      --missing: #d95926; --covered: #3987e5; --sidewalk: #3fbf87; --accent: #6da7ec;
       --row-hover: #262624; --row-active: #1c2c44;
     }
   }
@@ -27,7 +27,7 @@
     color-scheme: dark;
     --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f;
     --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
-    --missing: #d95926; --covered: #3987e5; --accent: #6da7ec;
+    --missing: #d95926; --covered: #3987e5; --sidewalk: #3fbf87; --accent: #6da7ec;
     --row-hover: #262624; --row-active: #1c2c44;
   }
   * { box-sizing: border-box; }
@@ -51,6 +51,7 @@
   @media (max-width: 900px) { #map { height: 420px; } }
   .legend { display: flex; flex-wrap: wrap; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--border);
             font-size: 13px; color: var(--text-secondary); }
+  .legend .sw[hidden] { display: none; }
   .legend i { display: inline-block; width: 22px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
   .tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .tabs button { font: inherit; font-size: 14px; border: 1px solid transparent; background: none; color: var(--text-secondary);
@@ -105,6 +106,7 @@
       <div class="legend">
         <span><i style="background:var(--missing)"></i>No sidewalk within 25 ft</span>
         <span><i style="background:var(--covered)"></i>Sidewalk present</span>
+        <span class="sw" id="legend-sidewalks" hidden><i style="background:var(--sidewalk); height:2px"></i>Sidewalk inventory</span>
         <span class="muted" id="legend-note">Shows collector/arterial frontage citywide, plus all frontage of the ranked owners.
           Click a row to zoom.</span>
       </div>
@@ -117,6 +119,8 @@
         </div>
         <button class="toggle" id="hide-others" aria-pressed="false"
                 title="Show only the selected owner's frontage on the map">Hide unselected</button>
+        <button class="toggle" id="show-sidewalks" aria-pressed="false"
+                title="Overlay every sidewalk in the city's inventory">Show all sidewalks</button>
         <input class="search" type="search" placeholder="Filter owners…" aria-label="Filter owners">
       </div>
       <div class="tablewrap">
@@ -169,6 +173,10 @@ const map = L.map("map", { preferCanvas: true }).setView([35.99, -78.90], 12);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Data: City/County of Durham'
 }).addTo(map);
+
+// Sidewalk inventory sits in its own pane below the frontage lines, so frontage stays on top and clickable.
+map.createPane("sidewalks").style.zIndex = 390;
+let sidewalkLayer = null, sidewalksOn = false, sidewalksLoading = null;
 
 let layer, owners = [], byId = {}, selected = null, sortKey = "major", filter = "";
 let hideOthers = false, allLines = [], linesByOwner = {};  // sublayers, kept so they can be removed and re-added
@@ -273,8 +281,36 @@ document.getElementById("hide-others").addEventListener("click", e => {
   e.currentTarget.setAttribute("aria-pressed", hideOthers);
   applyVisibility();
 });
+// "Show all sidewalks": the inventory file is only downloaded the first time it is switched on.
+const swBtn = document.getElementById("show-sidewalks");
+const swStyle = () => ({ color: css("--sidewalk"), weight: 1.5, opacity: 0.85 });
+function loadSidewalks() {
+  sidewalksLoading ||= fetch("data/sidewalks.geojson")
+    .then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.json(); })
+    .then(geo => sidewalkLayer = L.geoJSON(geo, {
+      pane: "sidewalks", interactive: false, style: swStyle,
+      renderer: L.canvas({ pane: "sidewalks" }),
+    }));
+  return sidewalksLoading;
+}
+swBtn.addEventListener("click", () => {
+  sidewalksOn = !sidewalksOn;
+  swBtn.setAttribute("aria-pressed", sidewalksOn);
+  document.getElementById("legend-sidewalks").hidden = !sidewalksOn;
+  if (!sidewalksOn) { sidewalkLayer?.remove(); return; }
+  swBtn.textContent = "Loading sidewalks…"; swBtn.disabled = true;
+  loadSidewalks()
+    .then(l => { if (sidewalksOn) l.addTo(map); })
+    .catch(err => {
+      sidewalksLoading = null; sidewalksOn = false;
+      swBtn.setAttribute("aria-pressed", false);
+      document.getElementById("legend-sidewalks").hidden = true;
+      alert("Could not load the sidewalk layer: " + err.message);
+    })
+    .finally(() => { swBtn.textContent = "Show all sidewalks"; swBtn.disabled = false; });
+});
 document.querySelector(".search").addEventListener("input", e => { filter = e.target.value.toLowerCase(); renderRows(); });
-dark.addEventListener("change", () => layer && layer.setStyle(style));
+dark.addEventListener("change", () => { layer && layer.setStyle(style); sidewalkLayer?.setStyle(swStyle); });
 </script>
 </body>
 </html>

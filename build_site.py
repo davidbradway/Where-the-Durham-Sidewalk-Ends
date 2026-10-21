@@ -1,8 +1,9 @@
 """Build the static outreach site from sidewalk_gaps.py outputs.
 
-Usage:  python build_site.py [outputs_dir=outputs] [site_dir=site]
+Usage:  python build_site.py [outputs_dir=outputs] [site_dir=site] [data_dir=data]
 
-Writes site/index.html (copied from web/index.html) plus site/data/*.json|csv.
+Writes site/index.html (copied from web/index.html) plus site/data/*.json|csv, and
+site/data/sidewalks.geojson (the full sidewalk inventory, for the "Show all sidewalks" toggle).
 Only organisations (companies, institutions, governments, associations) are named;
 parcels owned by individuals are shown on the map without a name.
 """
@@ -15,6 +16,7 @@ import shapely
 
 outputs = Path(sys.argv[1] if len(sys.argv) > 1 else "outputs")
 site = Path(sys.argv[2] if len(sys.argv) > 2 else "site")
+data_dir = Path(sys.argv[3] if len(sys.argv) > 3 else "data")
 TOP_N = 100
 
 ENTITY = re.compile(
@@ -73,6 +75,13 @@ for is_named, row in zip(named, fr.itertuples()):
                                  "n": name, "a": val(row.LOCATION_ADDR) if name else None},
                   "geometry": shapely.geometry.mapping(geom)})
 
+# ------------------------------------------------------------ sidewalk inventory (geometry only)
+sw = gpd.read_file(data_dir / "sidewalks.geojson").set_crs(2264, allow_override=True)
+sw = sw[sw.geometry.notna() & ~sw.geometry.is_empty]
+sw_geoms = shapely.set_precision(sw.geometry.simplify(3).to_crs(4326).to_numpy(), 1e-5)
+sw_feats = [{"type": "Feature", "properties": {}, "geometry": shapely.geometry.mapping(g)}
+            for g in sw_geoms if g is not None and not g.is_empty]
+
 # ------------------------------------------------------------ summary
 par = pd.read_csv(outputs / "parcels_frontage.csv", usecols=["frontage_ft", "missing_ft", "missing_major_ft", "LAND_CLASS"],
                   low_memory=False)
@@ -106,9 +115,12 @@ shutil.copy(Path(__file__).parent / "web" / "index.html", site / "index.html")
 (site / "data" / "frontage.geojson").write_text(
     json.dumps({"type": "FeatureCollection", "features": feats}, separators=(",", ":"), allow_nan=False),
     encoding="utf-8")
+(site / "data" / "sidewalks.geojson").write_text(
+    json.dumps({"type": "FeatureCollection", "features": sw_feats}, separators=(",", ":"), allow_nan=False),
+    encoding="utf-8")
 cols = ["owner", "parcels", "frontage_ft", "missing_ft", "missing_major_ft", "pct_missing", "pending_missing_ft", "raw_names"]
 top.assign(rank_all=top.owner.map(rank_all), rank_major=top.owner.map(rank_major))[
     ["rank_all", "rank_major"] + cols].round(0).to_csv(site / "data" / "top_owners.csv", index=False)
 for p in sorted((site / "data").iterdir()):
     print(f"{p}: {p.stat().st_size / 1e6:.1f} MB")
-print(f"{len(feats):,} map features, {len(top)} named owners")
+print(f"{len(feats):,} map features, {len(sw_feats):,} sidewalk features, {len(top)} named owners")
