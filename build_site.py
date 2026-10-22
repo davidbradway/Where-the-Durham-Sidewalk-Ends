@@ -58,10 +58,14 @@ def val(x):
     """JSON-safe scalar: pandas missing values (NaN/NA) become None."""
     return None if pd.isna(x) else x
 
-bbox = {}
-for oid, g in fr[fr.oid.notna()].groupby("oid"):
-    x0, y0, x1, y1 = g.total_bounds
-    bbox[int(oid)] = [round(y0, 5), round(x0, 5), round(y1, 5), round(x1, 5)]
+def bboxes(df):
+    out = {}
+    for oid, g in df[df.oid.notna()].groupby("oid"):
+        x0, y0, x1, y1 = g.total_bounds
+        out[int(oid)] = [round(y0, 5), round(x0, 5), round(y1, 5), round(x1, 5)]
+    return out
+
+bbox, bbox_major = bboxes(fr), bboxes(fr[fr.street_class == "major"])  # zoom target per map tab
 
 feats = []
 for is_named, row in zip(named, fr.itertuples()):
@@ -103,7 +107,7 @@ owners_json = [{
     "frontage_mi": round(r.frontage_ft / 5280, 2), "missing_mi": round(r.missing_ft / 5280, 2),
     "major_mi": round(r.missing_major_ft / 5280, 2), "pct": round(r.pct_missing, 3),
     "names": val(r.raw_names), "rank_all": rank_all.get(r.owner), "rank_major": rank_major.get(r.owner),
-    "bbox": bbox.get(int(r.id)),
+    "bbox": bbox.get(int(r.id)), "bbox_major": bbox_major.get(int(r.id)),
 } for r in top.itertuples()]
 
 # ------------------------------------------------------------ write

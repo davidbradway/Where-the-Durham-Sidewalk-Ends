@@ -110,8 +110,7 @@
         <span><i style="background:var(--missing)"></i>No sidewalk within 25 ft</span>
         <span><i style="background:var(--covered)"></i>Sidewalk present</span>
         <span class="sw" id="legend-sidewalks" hidden><i style="background:var(--sidewalk); height:2px"></i>Sidewalk inventory</span>
-        <span class="muted" id="legend-note">Shows arterial frontage citywide, plus all frontage of the ranked owners.
-          Click a row to zoom.</span>
+        <span class="muted" id="legend-note">Shows busy-street (arterial) frontage citywide. Click a row to zoom.</span>
       </div>
     </div>
     <div class="panel">
@@ -287,16 +286,20 @@ function renderRows() {
 
 // With "Hide unselected" on, only the selected owner's lines stay on the map. Lines are removed rather
 // than made transparent so hidden ones don't still show tooltips or catch clicks.
+// The tab picks the dataset: "Busy streets" shows busy-street frontage citywide; "All streets" shows
+// every frontage segment, on any street, of the owners in the all-streets top 100.
+const inTab = p => sortKey === "major" ? p.c === "m" : p.o != null && byId[p.o].rank_all != null;
 function applyVisibility() {
   if (!layer) return;
   layer.clearLayers();
-  const shown = !hideOthers ? allLines : selected === null ? [] : linesByOwner[selected] || [];
-  shown.forEach(l => layer.addLayer(l));
+  const pool = !hideOthers ? allLines : selected === null ? [] : linesByOwner[selected] || [];
+  pool.filter(l => inTab(l.feature.properties)).forEach(l => layer.addLayer(l));
   layer.setStyle(style);
   document.getElementById("map-hint").hidden = !(hideOthers && selected === null);
   document.getElementById("legend-note").textContent = hideOthers
-    ? "Showing the selected owner only. Click a row to select an owner."
-    : "Shows arterial frontage citywide, plus all frontage of the ranked owners. Click a row to zoom.";
+    ? `Showing the selected owner's ${sortKey === "major" ? "busy-street " : ""}frontage only. Click a row to select an owner.`
+    : sortKey === "major" ? "Shows busy-street (arterial) frontage citywide. Click a row to zoom."
+    : "Shows all street frontage of the top 100 owners. Click a row to zoom.";
 }
 
 function select(id, zoom = true) {
@@ -304,7 +307,7 @@ function select(id, zoom = true) {
   if (hideOthers) applyVisibility(); else layer.setStyle(style);
   if (selected !== null) {
     if (!hideOthers) (linesByOwner[selected] || []).forEach(l => l.bringToFront());
-    const b = byId[selected].bbox;
+    const b = (sortKey === "major" && byId[selected].bbox_major) || byId[selected].bbox;
     if (zoom && b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [30, 30], maxZoom: 17 });
   }
   renderRows();
@@ -317,7 +320,9 @@ document.getElementById("rows").addEventListener("click", e => {
 const tabs = document.querySelectorAll('.tabs [role="tab"]');
 tabs.forEach(b => b.addEventListener("click", () => {
   tabs.forEach(x => x.setAttribute("aria-selected", x === b));
-  sortKey = b.dataset.sort; renderRows();
+  sortKey = b.dataset.sort;
+  if (selected !== null && !byId[selected][sortKey === "major" ? "rank_major" : "rank_all"]) selected = null;
+  applyVisibility(); renderRows();
 }));
 document.getElementById("hide-others").addEventListener("click", e => {
   hideOthers = !hideOthers;
