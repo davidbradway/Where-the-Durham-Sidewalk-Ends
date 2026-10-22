@@ -25,6 +25,7 @@ import shapely
 SEG_FT, SHARED_FT, STREET_FT, SIDEWALK_FT = 10.0, 1.5, 75.0, 25.0
 EXCLUDED_STREETS = {"INTERSTATE", "RAMP", "ALLEY", "PRIVATE", "MEDIAN_XING"}
 EXCLUDED_FUNC = {"Interstate", "Freeway/Expressway", "Freeway"}
+ARTERIALS = {"Minor Arterials", "MinorArterial", "Other Principal Arterials", "PrincipalArterial"}  # "busy"
 
 data = Path(sys.argv[1] if len(sys.argv) > 1 else "data")
 out = Path(sys.argv[2] if len(sys.argv) > 2 else "outputs")
@@ -92,7 +93,7 @@ print(f"frontage pieces {len(front):,}; covered {covered.sum():,}")
 i, j = stree.query_nearest(mid[front], all_matches=False)
 near = st_ok.iloc[j[np.argsort(i)]]
 street_class = np.where(near.FTRCODE.str.contains("Pending").to_numpy(), "pending",
-                np.where(near.FUNCCLASS.isin(["LocalRoads"]).to_numpy(), "local", "major"))
+                np.where(near.FUNCCLASS.isin(ARTERIALS).to_numpy(), "major", "local"))
 
 seg = pd.DataFrame({"pidx": seg_parcel[front], "len": seg_len[front], "covered": covered[front],
                     "cls": street_class})
@@ -102,7 +103,7 @@ agg = pd.DataFrame(index=by.index)
 agg["frontage_ft"] = by["len"][["local", "major"]].sum(axis=1)  # accepted streets only
 agg["missing_ft"] = by["miss"][["local", "major"]].sum(axis=1)
 agg["covered_ft"] = agg.frontage_ft - agg.missing_ft
-agg["missing_major_ft"] = by["miss"]["major"]  # collectors + arterials
+agg["missing_major_ft"] = by["miss"]["major"]  # minor + principal arterials
 agg["pending_frontage_ft"] = by["len"].get("pending", 0)
 agg["pending_missing_ft"] = by["miss"].get("pending", 0)
 print(seg.groupby("cls").apply(lambda g: f"{g.len.sum()/5280:,.0f} mi, {1-g.miss.sum()/g.len.sum():.0%} covered",

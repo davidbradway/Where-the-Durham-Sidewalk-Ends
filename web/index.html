@@ -92,7 +92,7 @@
 <main>
   <h1>Where the Durham Sidewalk Ends</h1>
   <p class="lede">How much street frontage in the City of Durham has no sidewalk, and which organizations own the most of it?
-    Most gaps front single-family homes. On busy collector and arterial streets, though, a small group of large
+    Most gaps front single-family homes. On busy arterial streets, though, a small group of large
     owners accounts for a big share of the gap, so they are the natural place to start.</p>
 
   <div class="tiles" id="tiles"></div>
@@ -106,7 +106,7 @@
         <span><i style="background:var(--missing)"></i>No sidewalk within 25 ft</span>
         <span><i style="background:var(--covered)"></i>Sidewalk present</span>
         <span class="sw" id="legend-sidewalks" hidden><i style="background:var(--sidewalk); height:2px"></i>Sidewalk inventory</span>
-        <span class="muted" id="legend-note">Shows collector/arterial frontage citywide, plus all frontage of the ranked owners.
+        <span class="muted" id="legend-note">Shows arterial frontage citywide, plus all frontage of the ranked owners.
           Click a row to zoom.</span>
       </div>
     </div>
@@ -142,7 +142,8 @@
         of a public street centerline. Interstates, ramps, alleys and private drives are excluded.</li>
       <li><b>Sidewalk.</b> A frontage piece is covered when a sidewalk from the city's inventory lies within 25 ft.
         Raising this to 35 ft changes coverage by about one percentage point.</li>
-      <li><b>Busy streets</b> are collectors and arterials (minor and principal) in the city's street functional class.</li>
+      <li><b>Busy streets</b> are minor and principal arterials in the city's street functional class. Collectors,
+        which are mostly two-lane neighborhood streets, count as local.</li>
       <li><b>Owners.</b> Names are normalized (punctuation and LLC/INC suffixes removed) and known variants are merged,
         e.g. Duke University with Duke University Health System, and the several spellings of Durham Public Schools
         and NCDOT.</li>
@@ -252,7 +253,7 @@ function applyVisibility() {
   document.getElementById("map-hint").hidden = !(hideOthers && selected === null);
   document.getElementById("legend-note").textContent = hideOthers
     ? "Showing the selected owner only. Click a row to select an owner."
-    : "Shows collector/arterial frontage citywide, plus all frontage of the ranked owners. Click a row to zoom.";
+    : "Shows arterial frontage citywide, plus all frontage of the ranked owners. Click a row to zoom.";
 }
 
 function select(id, zoom = true) {

@@ -17,30 +17,30 @@ by owner, so advocates can focus on the few organizations that control the most 
 | Street frontage measured | **1,970 mi** |
 | Frontage with a sidewalk within 25 ft | **32%** (637 mi) |
 | Frontage with **no** sidewalk | **1,333 mi** |
-| Coverage on local streets / busy streets (collectors + arterials) | 28% / 49% |
+| Coverage on local streets (incl. collectors) / busy streets (arterials) | 29% / 57% |
 | Share of missing frontage in front of single-family homes | 68% |
 | Share of missing frontage owned by the top 100 owners | 11% |
-| Share of the **busy-street** gap (227 mi) owned by the top 100 owners | **32%** |
+| Share of the **busy-street** gap (96 mi) owned by the top 100 owners | **43%** |
 
 **What this means for advocacy:** most missing sidewalk is in front of individual homes on local streets,
 so no small set of owners accounts for the gap overall. Busy streets are different. There, ten owners
-account for 17% of the gap and the top 100 for about a third. Ranking owners by busy-street frontage
+account for a quarter of the gap and the top 100 for over 40%. Ranking owners by busy-street frontage
 gives the shortest list of organizations to approach.
 
-### Top owners by missing sidewalk on busy streets (collectors and arterials)
+### Top owners by missing sidewalk on busy streets (arterials)
 
 | # | Owner | Missing, busy streets (mi) | Missing, all streets (mi) | % of their frontage missing |
 |--:|---|--:|--:|--:|
-| 1 | Duke University (incl. Duke University Health System) | 11.4 | 14.9 | 56% |
-| 2 | City of Durham | 11.1 | 25.3 | 57% |
-| 3 | NC Railroad | 4.8 | 8.1 | 86% |
-| 4 | Durham Public Schools | 3.0 | 6.1 | 38% |
-| 5 | United States of America (incl. VA) | 2.4 | 3.4 | 80% |
-| 6 | MI Homes of Raleigh | 1.3 | 1.5 | 99% |
-| 7 | Durham County | 1.2 | 2.7 | 35% |
-| 8 | Parkwood Association | 1.2 | 2.2 | 84% |
-| 9 | Sweetbrier Homeowners Association | 1.1 | 1.1 | 100% |
-| 10 | Hope Valley Farms North Homeowners Association | 1.0 | 1.8 | 44% |
+| 1 | Duke University (incl. Duke University Health System) | 10.2 | 14.9 | 56% |
+| 2 | City of Durham | 4.9 | 25.3 | 57% |
+| 3 | United States of America (incl. VA) | 2.4 | 3.4 | 80% |
+| 4 | NC Railroad | 2.1 | 8.1 | 86% |
+| 5 | Durham Public Schools | 1.3 | 6.1 | 38% |
+| 6 | Durham County | 0.8 | 2.7 | 35% |
+| 7 | Crossings Golf / Crossings HW / Crossings 1 | 0.7 | 1.0 | 81% |
+| 8 | IBM | 0.5 | 0.5 | 100% |
+| 9 | Diako Construction | 0.5 | 0.5 | 100% |
+| 10 | M M Fowler | 0.4 | 0.9 | 28% |
 
 ### Top owners by missing sidewalk on all streets
 
@@ -77,8 +77,8 @@ and offers the list as a CSV download.
 4. **Sidewalk coverage.** A frontage piece is covered if a sidewalk line lies within **25 ft**. Sensitivity:
    coverage is 30.6% at 25 ft and 31.8% at 35 ft. Beyond about 45 ft the buffer starts catching sidewalks
    on the far side of the street.
-5. **Street class.** Each frontage piece is tagged by its nearest street: *busy* (collector or arterial),
-   *local*, or *pending* (new subdivision streets the city has not yet accepted). Pending frontage is
+5. **Street class.** Each frontage piece is tagged by its nearest street: *busy* (minor or principal arterial),
+   *local* (local roads and collectors), or *pending* (new subdivision streets the city has not yet accepted). Pending frontage is
    reported separately and left out of the rankings. Its sidewalks are usually required but not yet in the
    inventory, and counting it made homebuilders look like top offenders.
 6. **Owner normalization.** Names are upper-cased, stripped of punctuation and of LLC/INC/CORP suffixes, and
